@@ -1,0 +1,38 @@
+schema: '2.0'
+stages:
+  preproc:
+    cmd: python3.10 notebooks/dvc_demo/preprocess.py
+    deps:
+    - path: data/raw/
+      hash: md5
+      md5: e209174bacaf8b0f68802ebd1dac560f.dir
+      size: 42467620
+      nfiles: 4
+    - path: notebooks/dvc_demo/preprocess.py
+      hash: md5
+      md5: 90bdc91e5f983eed99bc44ab70f18845
+      size: 567
+    outs:
+    - path: data/preproc/
+      hash: md5
+      md5: db94635cd9e0f8ef8df7c51f765cdb94.dir
+      size: 42953584
+      nfiles: 1
+  feature_eng:
+    cmd: python3.10 notebooks/dvc_demo/lag_features.py
+    deps:
+    - path: data/preproc/
+      hash: md5
+      md5: db94635cd9e0f8ef8df7c51f765cdb94.dir
+      size: 42953584
+      nfiles: 1
+    - path: notebooks/dvc_demo/lag_features.py
+      hash: md5
+      md5: 24b9bee193c3c24829cb44fe62b0a56f
+      size: 469
+    outs:
+    - path: data/feature_eng/
+      hash: md5
+      md5: e95a4175f729f02746ee78642d530489.dir
+      size: 47524217
+      nfiles: 1

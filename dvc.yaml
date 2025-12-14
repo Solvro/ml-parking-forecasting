@@ -1,0 +1,15 @@
+stages:
+  preproc:
+    cmd: python3.10 notebooks/dvc_demo/preprocess.py
+    deps:
+    - data/raw/
+    - notebooks/dvc_demo/preprocess.py
+    outs:
+    - data/preproc/
+  feature_eng:
+    cmd: python3.10 notebooks/dvc_demo/lag_features.py
+    deps:
+    - data/preproc/
+    - notebooks/dvc_demo/lag_features.py
+    outs:
+    - data/feature_eng/
