@@ -74,31 +74,36 @@ def add_holiday_features(df: pd.DataFrame, date_col: str = 'measured_at',copy: b
     next_holiday_dates = holiday_df['holiday_date'].values[next_positions]
     
     # Handle edge cases where there's no previous/next holiday
+    # Use NaN for missing values instead of magic numbers (works for datasets of any length)
     df['days_since_holiday'] = np.where(
         positions > 0,
         (dates_numeric - prev_holiday_dates.astype('datetime64[D]').astype(int)),
-        999 # Fill value if no previous holiday
-    ).astype(int)
+        np.nan
+    ).astype(float)
     
     df['days_until_holiday'] = np.where(
         positions < len(holiday_dates_numeric),
         (next_holiday_dates.astype('datetime64[D]').astype(int) - dates_numeric),
-        999 # Fill value if no next holiday
-    ).astype(int)
+        np.nan
+    ).astype(float)
     
     # Long Weekend Bridges Feature
-    # Monday is a bridge day if Friday (3 days before) or Tuesday (1 day after) is a holiday
-    # Friday is a bridge day if Thursday (1 day before) or Monday (3 days after) is a holiday
-    day_of_week = df[date_col].dt.dayofweek  # 0=Monday, 4=Friday, 6=Sunday
+    # Monday is a bridge day if Friday (3 days before), Tuesday (1 day after), Saturday (2 days before), or Sunday (1 day before) is a holiday
+    # Friday is a bridge day if Thursday (1 day before), Monday (3 days after), Saturday (1 day after), or Sunday (2 days after) is a holiday
+    day_of_week = df[date_col].dt.dayofweek  # 0=Monday, 4=Friday, 5=Saturday, 6=Sunday
     
     bridge_monday = (day_of_week == 0) & (
         (df['days_since_holiday'] == 3) |  # Friday was a holiday
+        (df['days_since_holiday'] == 2) |  # Saturday was a holiday
+        (df['days_since_holiday'] == 1) |  # Sunday was a holiday
         (df['days_until_holiday'] == 1)    # Tuesday is a holiday
     )
     
     bridge_friday = (day_of_week == 4) & (
         (df['days_since_holiday'] == 1) |  # Thursday was a holiday
-        (df['days_until_holiday'] == 3)    # Monday is a holiday
+        (df['days_until_holiday'] == 3) |  # Monday is a holiday
+        (df['days_until_holiday'] == 2) |  # Sunday is a holiday
+        (df['days_until_holiday'] == 1)    # Saturday is a holiday
     )
     
     df['is_long_weekend_bridge'] = (bridge_monday | bridge_friday).astype(int) 
