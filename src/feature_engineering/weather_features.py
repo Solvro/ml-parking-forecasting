@@ -1,5 +1,6 @@
 import pandas as pd
 import requests
+from datetime import datetime
 from typing import List, Optional, Tuple
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -66,6 +67,54 @@ def fetch_historical_weather(
     return df
 
 
+def fetch_weather_for_range(
+    dates: pd.Series,
+    location: Location,
+    features: List[str]
+) -> pd.DataFrame:
+    """
+    Internal function to fetch weather data for a date range, handling both
+    historical and forecast data automatically.
+    
+    Arguments:
+    - dates: Series of datetime values
+    - location: Tuple of (latitude, longitude)
+    - features: List of weather features to fetch
+    
+    Returns:
+    - Combined DataFrame with weather data
+    """
+    today = pd.Timestamp(datetime.now().date())
+    min_date = dates.min()
+    max_date = dates.max()
+    
+    weather_dfs = []
+    
+    # Fetch historical data if needed (dates before today)
+    if min_date.date() < today.date():
+        hist_end = min(max_date, today - pd.Timedelta(days=1))
+        hist_df = fetch_historical_weather(
+            min_date.strftime('%Y-%m-%d'),
+            hist_end.strftime('%Y-%m-%d'),
+            location,
+            features
+        )
+        weather_dfs.append(hist_df)
+    
+    # Fetch forecast data if needed (dates from today onwards)
+    if max_date.date() >= today.date():
+        forecast_df = fetch_weather_forecast(location, features)
+        weather_dfs.append(forecast_df)
+    
+    # Combine and deduplicate
+    if len(weather_dfs) == 1:
+        return weather_dfs[0]
+    
+    combined = pd.concat(weather_dfs, ignore_index=True)
+    combined = combined.drop_duplicates(subset=['time'], keep='last')
+    return combined.sort_values('time').reset_index(drop=True)
+
+
 def add_weather_features(
     df: pd.DataFrame,
     date_col: str = 'measured_at',
@@ -77,6 +126,9 @@ def add_weather_features(
     """
     Add weather features to a DataFrame by merging with weather data.
     
+    Automatically handles both historical and future dates - fetches from
+    historical API for past dates and forecast API for future dates.
+    
     Arguments:
     - df: Input DataFrame
     - date_col: Name of the time column (default 'measured_at')
@@ -84,7 +136,7 @@ def add_weather_features(
     - location: Tuple of (latitude, longitude) for weather data
     - features: List of weather features to fetch
     - weather_df: Optional pre-fetched weather DataFrame. If not provided,
-                  historical weather will be fetched based on the date range in df.
+                  weather will be fetched automatically based on the date range in df.
     
     Returns:
     - DataFrame with weather features merged
@@ -101,9 +153,7 @@ def add_weather_features(
     
     # Fetch weather data if not provided
     if weather_df is None:
-        start_date = df[date_col].min().strftime('%Y-%m-%d')
-        end_date = df[date_col].max().strftime('%Y-%m-%d')
-        weather_df = fetch_historical_weather(start_date, end_date, location, features)
+        weather_df = fetch_weather_for_range(df[date_col], location, features)
     
     # Ensure weather_df has datetime column
     if 'time' not in weather_df.columns:
