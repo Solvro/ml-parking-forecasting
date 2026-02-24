@@ -30,6 +30,7 @@ def generate_ts_folds(
     step_periods: Optional[int] = None,
     gap_periods: int = 0,
     min_train_periods: int = 365,
+    lookback_periods: int = 0,
     freq: str = "D",
     most_recent_first: bool = True,
 ) -> List[Dict[str, str]]:
@@ -46,6 +47,9 @@ def generate_ts_folds(
         step_periods (int): Step size between folds in ``freq`` units. Defaults to ``val_periods``.
         gap_periods (int): Gap between training and validation in ``freq`` units. Default 0.
         min_train_periods (int): Minimum required training length in ``freq`` units. Default 365.
+        lookback_periods (int): Number of ``freq`` units to shift ``train_start_date`` forward
+            so that lag / rolling-window features are valid from the first training row.
+            Typically the output of ``required_lookback_periods()``. Default 0.
         freq (str): Time unit for all period parameters. One of ``'D'`` (days),
             ``'h'`` (hours), ``'min'`` (minutes). Default ``'D'``.
         most_recent_first (bool): If True, returns folds starting from the latest date.
@@ -69,6 +73,8 @@ def generate_ts_folds(
         raise ValueError("gap_periods must be >= 0.")
     if min_train_periods < 1:
         raise ValueError("min_train_periods must be >= 1.")
+    if lookback_periods < 0:
+        raise ValueError("lookback_periods must be >= 0.")
 
     unit_label = FREQ_LABELS[freq]
 
@@ -87,11 +93,26 @@ def generate_ts_folds(
     if step_periods < 1:
         raise ValueError("step_periods must be >= 1.")
 
+    # Shift train_start forward by the lookback buffer so that all
+    # lag / rolling-window features are valid from the first training row.
+    if lookback_periods > 0:
+        train_start_date = train_start_date + ( lookback_periods * pd.Timedelta(1, unit=freq) )
+
     if cutoff_end < train_start_date:
-        raise ValueError("cutoff_end must be on or after train_start_date.")
+        raise ValueError("cutoff_end must be on or after train_start_date (after lookback shift).")
 
     # Build timedeltas using the chosen frequency
     one_unit = pd.Timedelta(1, unit=freq)
+
+    # Upfront check: enough data for at least one fold?
+    required_minimum = lookback_periods + min_train_periods + val_periods + gap_periods
+    available = int((cutoff_end - train_start_date) / one_unit) + 1
+    if required_minimum > available:
+        raise ValueError(
+            f"Not enough data: need at least {required_minimum} {unit_label} "
+            f"(lookback={lookback_periods} + min_train={min_train_periods} + "
+            f"gap={gap_periods} + val={val_periods}), but only {available} {unit_label} available."
+        )
 
     folds = []
 
