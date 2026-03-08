@@ -4,11 +4,13 @@ import datetime as dt
 from sklearn.base import BaseEstimator, TransformerMixin
 class ExpandingFeaturesCreator(BaseEstimator, TransformerMixin):
     """Creates expanding features such as cumulative mean, max, min, and trend for specified columns based on parking_id groups."""
-    def __init__(self, expanding_features, group_col='parking_id', convert_to_32=False, shift_guard_minutes=1):
+    def __init__(self, expanding_features, convert_to_32=False, shift_guard_periods=1, copy=True, group_cols=['parking_id'], fill_nan_with_zero=False):
         self.expanding_features = expanding_features
-        self.group_col = group_col
+        self.group_cols = group_cols
         self.convert_to_32 = convert_to_32
-        self.shift_guard_minutes = shift_guard_minutes
+        self.copy = copy
+        self.shift_guard_periods = shift_guard_periods
+        self.fill_nan_with_zero = fill_nan_with_zero
 
     def fit(self, X, y=None):
         if hasattr(X, "columns"):
@@ -17,7 +19,10 @@ class ExpandingFeaturesCreator(BaseEstimator, TransformerMixin):
         return self  
 
     def transform(self, X):
-        X = X.copy()
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("This transformer requires X to be a pandas DataFrame, not a numpy array.")
+        if self.copy:
+            X = X.copy()
 
         for _, (suffix, feature_type, columns) in self.expanding_features.items():
             for col in columns:
@@ -25,21 +30,25 @@ class ExpandingFeaturesCreator(BaseEstimator, TransformerMixin):
 
 
                 X[new_col_name] = (
-                    X.groupby(self.group_col)[col]
+                    X.groupby(self.group_cols)[col]
                      .expanding()
                      .agg(feature_type)   # Uses "mean", "max", "min", "std" dynamically
-                     .shift(self.shift_guard_minutes)
+                     .groupby(level=0) 
+                     .shift(self.shift_guard_periods)
                      .reset_index(level=0, drop=True)
                 )
-
-                X[new_col_name] = X[new_col_name].fillna(0)
+                if self.fill_nan_with_zero:
+                    X[new_col_name] = X[new_col_name].fillna(0)
 
         if self.convert_to_32:
-            new_cols = [f"{col}_{suffix}" for _, (suffix, _, columns) in self.expanding_features.items() for col in columns]
-            int_cols = X[new_cols].select_dtypes(include=['int64']).columns
-            float_cols = X[new_cols].select_dtypes(include=['float64']).columns
-            X[int_cols] = X[int_cols].astype(np.int32)
-            X[float_cols] = X[float_cols].astype(np.float32)
+            try:    
+                new_cols = [f"{col}_{suffix}" for _, (suffix, _, columns) in self.expanding_features.items() for col in columns]
+                int_cols = X[new_cols].select_dtypes(include=['int64']).columns
+                float_cols = X[new_cols].select_dtypes(include=['float64']).columns
+                X[int_cols] = X[int_cols].astype(np.int32)
+                X[float_cols] = X[float_cols].astype(np.float32)
+            except Exception as e:
+                print(f"Error occurred while converting data types: {e}")
         return X
 
     def get_feature_names_out(self, input_features=None):

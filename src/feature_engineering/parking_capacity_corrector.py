@@ -3,54 +3,70 @@ import numpy as np
 import datetime as dt
 from sklearn.base import BaseEstimator, TransformerMixin
 class ParkingSpacesCorrector(BaseEstimator, TransformerMixin):
-    """Corrects parking space counts based on expansion status and calculates additional features related to capacity and utilization."""
+    """Corrects parking space counts based on expansion status and calculates additional features related to capacity and utilization.
+    First grouping columns should be parking_id as it is used for the mapping of expansion dates and previous capacities."""
 
-    def __init__(self, parkings_df, expansion_date_map, previous_size_map, convert_to_32=False):
+    def __init__(self, parkings_df, expansion_date_map, previous_size_map, convert_to_32=False, copy = True, group_cols=['parking_id']):
         self.parkings_df = parkings_df
         self.expansion_date_map = expansion_date_map
         self.previous_size_map = previous_size_map
         self.convert_to_32 = convert_to_32
+        self.copy = copy
+        self.group_cols = group_cols
+        if not isinstance(parkings_df, pd.DataFrame):
+            raise TypeError("This transformer requires parkings_df to be a pandas DataFrame, not a numpy array.")
 
     def fit(self, X, y=None):
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("This transformer requires X to be a pandas DataFrame, not a numpy array.")
         if hasattr(X, "columns"):
                 self.feature_names_in_ = X.columns
+
+        # Pre-calculate mapping data once during fit
+        meta = self.parkings_df[['id', 'name', 'max_spaces_left']].copy()
+
+        # Map expansion dates and previous capacities
+        meta['exp_date'] = meta['name'].map(self.expansion_date_map).fillna("2200-01-01")
+        meta['cap_before'] = meta['name'].map(self.previous_size_map).fillna(meta['max_spaces_left'])
+
+        # Create a fast lookup dataframe indexed by 'id' 
+        self.parkings_meta_ = meta.set_index('id')[['exp_date', 'cap_before', 'max_spaces_left']]
         return self  
 
     def transform(self, X):
-        X = X.copy()
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError("This transformer requires X to be a pandas DataFrame, not a numpy array.")
+        if self.copy:
+            X = X.copy()
 
         X['overbooked'] = (X['spaces_left'] < 0).astype(int)
         X['overbooked_spaces'] = np.where(X['overbooked'] == 1, -X['spaces_left'], 0)
 
-        X_grouped = X.groupby('parking_id')
+        X = X.join(self.parkings_meta_, on=self.group_cols[0])
 
-        for parking_id, group in X_grouped:
-            # Determine expansion status based on parking_id and measured_at
-            parking_data = self.parkings_df[self.parkings_df['id'] == parking_id].iloc[0]
-            exp_date_str = self.expansion_date_map.get(parking_data['name'], "2200-01-01")
-            group['is_expanded'] = (group['measured_at'] >= exp_date_str).astype(int)
-            X.loc[group.index, 'is_expanded'] = group['is_expanded']
+        X['is_expanded'] = (X['measured_at'] >= X['exp_date']).astype(int)
 
-            #cqalculate total capacity based on expansion status
-            cap_after_expansion = parking_data['max_spaces_left']
-            cap_before_expansion = self.previous_size_map.get(parking_data['name'], cap_after_expansion)
-            group['total_capacity'] = np.where(group['is_expanded'] == 1, cap_after_expansion, cap_before_expansion)
-            X.loc[group.index, 'total_capacity'] = group['total_capacity']
+        # Capacity assignment
+        X['total_capacity'] = np.where(X['is_expanded'] == 1, X['max_spaces_left'], X['cap_before'])
 
-            # Ensure spaces_left does not exceed total_capacity and is not negative
-            group['spaces_left'] = group['spaces_left'].clip(upper=group['total_capacity'])
-            group['spaces_left'] = group['spaces_left'].clip(lower=0)
-            X.loc[group.index, 'spaces_left'] = group['spaces_left']
+        # Clip spaces_left to be between 0 and total_capacity
+        X['spaces_left'] = X['spaces_left'].clip(lower=0, upper=X['total_capacity'])
 
-            # Calculate utilization rate
-            X.loc[group.index, 'utilization_rate'] = (X['total_capacity'] - X['spaces_left']) / X['total_capacity']
+        # Calculate utilization rate
+        X['utilization_rate'] = (X['total_capacity'] - X['spaces_left']) / X['total_capacity']
 
+        # Clean up temporary columns
+        X = X.drop(columns=['exp_date', 'cap_before', 'max_spaces_left'])
 
         if self.convert_to_32:
-            int_cols = ['overbooked', 'is_expanded', 'overbooked_spaces', 'total_capacity']
-            float_cols = ['utilization_rate']
-            X[int_cols] = X[int_cols].astype(np.int32)
-            X[float_cols] = X[float_cols].astype(np.float32)
+            try:
+                int_cols = ['overbooked', 'is_expanded', 'overbooked_spaces', 'total_capacity']
+                float_cols = ['utilization_rate']
+                X[int_cols] = X[int_cols].astype(np.int32)
+                X[float_cols] = X[float_cols].astype(np.float32)
+            except Exception as e:
+                print(f"Error occurred while converting data types: {e}")
+
         return X
     def get_feature_names_out(self, input_features=None):
         if input_features is None:
