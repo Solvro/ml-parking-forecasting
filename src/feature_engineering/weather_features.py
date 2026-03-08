@@ -178,7 +178,6 @@ def add_weather_features(
     df: pd.DataFrame,
     date_col: str = 'measured_at',
     copy: bool = False,
-    copy_weather_df: bool = False,
     location: Location = DEFAULT_LOCATION,
     features: List[str] = DEFAULT_FEATURES,
     weather_df: Optional[pd.DataFrame] = None
@@ -192,8 +191,8 @@ def add_weather_features(
     Arguments:
     - df: Input DataFrame
     - date_col: Name of the time column (default 'measured_at')
-    - copy: Whether to copy the DataFrame before modifying (default False)
-    - copy_weather_df: Whether to copy the weather DataFrame before modifying (default False)
+    - copy: Whether to copy DataFrames before modifying (default False).
+            Applies to both df and weather_df to prevent mutation of inputs.
     - location: Tuple of (latitude, longitude) for weather data
     - features: List of weather features to fetch
     - weather_df: Optional pre-fetched weather DataFrame. If not provided,
@@ -215,7 +214,7 @@ def add_weather_features(
     # Fetch weather data if not provided
     if weather_df is None:
         weather_df = fetch_weather_for_range(df[date_col], location, features)
-    elif copy_weather_df:
+    elif copy:
         weather_df = weather_df.copy()
     
     # Ensure weather_df has datetime column
