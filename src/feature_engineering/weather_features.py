@@ -1,7 +1,39 @@
 import pandas as pd
 import requests
-from datetime import datetime
-from typing import List, Optional, Tuple
+from datetime import datetime, date
+from typing import List, Optional, Tuple, Union
+
+DateLike = Union[str, datetime, date, pd.Timestamp]
+
+
+def _parse_date(d: DateLike, param_name: str) -> str:
+    """
+    Parse and validate a date input, returning 'YYYY-MM-DD' string.
+    
+    Arguments:
+    - d: Date as string, datetime, date, or pd.Timestamp
+    - param_name: Parameter name for error messages
+    
+    Returns:
+    - Date string in 'YYYY-MM-DD' format
+    
+    Raises:
+    - ValueError: If the date format is invalid
+    """
+    if isinstance(d, str):
+        try:
+            parsed = datetime.strptime(d, '%Y-%m-%d')
+            return parsed.strftime('%Y-%m-%d')
+        except ValueError:
+            raise ValueError(
+                f"Invalid date format for '{param_name}': '{d}'. Expected 'YYYY-MM-DD'."
+            )
+    elif isinstance(d, (datetime, date, pd.Timestamp)):
+        return pd.Timestamp(d).strftime('%Y-%m-%d')
+    else:
+        raise TypeError(
+            f"'{param_name}' must be a string, datetime, date, or pd.Timestamp, got {type(d).__name__}"
+        )
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 HISTORICAL_URL = "https://historical-forecast-api.open-meteo.com/v1/forecast"
@@ -11,12 +43,13 @@ DEFAULT_LOCATION = (51.1116, 17.0601)
 
 DEFAULT_FEATURES = ["temperature_2m", "rain", "apparent_temperature", "snowfall", "snow_depth", "precipitation", "weather_code", "visibility", "surface_pressure", "wind_speed_10m"]
 
-type Location = Tuple[float, float]
+Location = Tuple[float, float]
 
 
 def fetch_weather_forecast(
     location: Location = DEFAULT_LOCATION,
-    features: List[str] = DEFAULT_FEATURES
+    features: List[str] = DEFAULT_FEATURES,
+    forecast_days: Optional[int] = None
 ) -> pd.DataFrame:
     """
     Fetch weather forecast data from Open-Meteo API.
@@ -24,23 +57,31 @@ def fetch_weather_forecast(
     Arguments:
     - location: Tuple of (latitude, longitude)
     - features: List of weather features to fetch
+    - forecast_days: Number of forecast days to fetch (1-16). If None, uses API default (7 days).
     
     Returns:
     - DataFrame with weather forecast data
     """
-    response = requests.get(
-        f"{FORECAST_URL}?latitude={location[0]}&longitude={location[1]}&hourly={','.join(features)}"
-    )
-    response.raise_for_status()
+    url = f"{FORECAST_URL}?latitude={location[0]}&longitude={location[1]}&hourly={','.join(features)}"
+    if forecast_days is not None:
+        url += f"&forecast_days={forecast_days}"
+    response = requests.get(url, timeout=10)
+    try:
+        
+        response.raise_for_status()
     
-    df = pd.DataFrame(response.json()["hourly"])
-    df["time"] = pd.to_datetime(df["time"])
+        df = pd.DataFrame(response.json()["hourly"])
+        df["time"] = pd.to_datetime(df["time"])
+    except requests.RequestException as e:
+        print(f"Error fetching weather forecast: {e}")
+    except KeyError as e:
+        print(f"Unexpected response format: missing key {e}")
     return df
 
 
 def fetch_historical_weather(
-    start_date: str,
-    end_date: str,
+    start_date: DateLike,
+    end_date: DateLike,
     location: Location = DEFAULT_LOCATION,
     features: List[str] = DEFAULT_FEATURES
 ) -> pd.DataFrame:
@@ -48,22 +89,36 @@ def fetch_historical_weather(
     Fetch historical weather data from Open-Meteo API.
     
     Arguments:
-    - start_date: Start date in 'YYYY-MM-DD' format
-    - end_date: End date in 'YYYY-MM-DD' format
+    - start_date: Start date (string 'YYYY-MM-DD', datetime, date, or pd.Timestamp)
+    - end_date: End date (string 'YYYY-MM-DD', datetime, date, or pd.Timestamp)
     - location: Tuple of (latitude, longitude)
     - features: List of weather features to fetch
     
     Returns:
     - DataFrame with historical weather data
+    
+    Raises:
+    - ValueError: If date format is invalid
+    - TypeError: If date type is not supported
     """
+    start_str = _parse_date(start_date, 'start_date')
+    end_str = _parse_date(end_date, 'end_date')
+    
     response = requests.get(
         f"{HISTORICAL_URL}?latitude={location[0]}&longitude={location[1]}"
-        f"&start_date={start_date}&end_date={end_date}&hourly={','.join(features)}"
+        f"&start_date={start_str}&end_date={end_str}&hourly={','.join(features)}",
+        timeout=30
     )
-    response.raise_for_status()
-    
-    df = pd.DataFrame(response.json()["hourly"])
-    df["time"] = pd.to_datetime(df["time"])
+    try:
+        response.raise_for_status()
+        df = pd.DataFrame(response.json()["hourly"])
+        df["time"] = pd.to_datetime(df["time"])
+    except requests.RequestException as e:
+        print(f"Error fetching historical weather data: {e}")
+        return pd.DataFrame()
+    except KeyError as e:
+        print(f"Unexpected response format: missing key {e}")
+        return pd.DataFrame()
     return df
 
 
@@ -103,7 +158,11 @@ def fetch_weather_for_range(
     
     # Fetch forecast data if needed (dates from today onwards)
     if max_date.date() >= today.date():
-        forecast_df = fetch_weather_forecast(location, features)
+        # Calculate required forecast days (from today to max_date, inclusive)
+        forecast_days = (max_date.date() - today.date()).days + 1
+        # Clamp to API limits (1-16 days)
+        forecast_days = max(1, min(forecast_days, 16))
+        forecast_df = fetch_weather_forecast(location, features, forecast_days)
         weather_dfs.append(forecast_df)
     
     # Combine and deduplicate
@@ -119,6 +178,7 @@ def add_weather_features(
     df: pd.DataFrame,
     date_col: str = 'measured_at',
     copy: bool = False,
+    copy_weather_df: bool = False,
     location: Location = DEFAULT_LOCATION,
     features: List[str] = DEFAULT_FEATURES,
     weather_df: Optional[pd.DataFrame] = None
@@ -133,6 +193,7 @@ def add_weather_features(
     - df: Input DataFrame
     - date_col: Name of the time column (default 'measured_at')
     - copy: Whether to copy the DataFrame before modifying (default False)
+    - copy_weather_df: Whether to copy the weather DataFrame before modifying (default False)
     - location: Tuple of (latitude, longitude) for weather data
     - features: List of weather features to fetch
     - weather_df: Optional pre-fetched weather DataFrame. If not provided,
@@ -154,6 +215,8 @@ def add_weather_features(
     # Fetch weather data if not provided
     if weather_df is None:
         weather_df = fetch_weather_for_range(df[date_col], location, features)
+    elif copy_weather_df:
+        weather_df = weather_df.copy()
     
     # Ensure weather_df has datetime column
     if 'time' not in weather_df.columns:
