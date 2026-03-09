@@ -64,18 +64,31 @@ def prepare_dataframes(
     events_df: pd.DataFrame,
     park_availability_raw: pd.DataFrame,
     sks_raw: pd.DataFrame,
-    park_info_df: pd.DataFrame
+    park_info_df: pd.DataFrame,
+    copy=False
 
 )-> tuple[pd.DataFrame, pd.DataFrame]:
 
+
+    if copy:
+        park_availability_raw = park_availability_raw.copy()
+        sks_raw = sks_raw.copy()
+
+
     #Events dataframe preparation
+
+
+
+
 
     min_date_park = pd.to_datetime(park_availability_raw["measured_at"]).min()
     min_date_sks = pd.to_datetime(sks_raw["external_timestamp"]).min()
 
     cut_off_date = min(min_date_park, min_date_sks)
 
+
     events_df["end"] = pd.to_datetime(events_df["end"])
+    events_df["start"] = pd.to_datetime(events_df["start"])
 
     #Cut events that ended before our parking data (we don't want to waste resources)
     events_df = events_df.loc[events_df["end"] >= cut_off_date].copy()
@@ -209,7 +222,7 @@ class IQROutlierDetector:
         original_length = len(result_df)
 
         # Prepend training history to provide context for the initial rolling windows
-        if self.train_history_ is not None and result_df.index.min() > self.train_history_.index.min():
+        if self.train_history_ is not None and result_df.index.min() > self.train_history_.index.max():
             calc_df = pd.concat([self.train_history_, result_df]).sort_index()
         else:
             calc_df = result_df
@@ -253,7 +266,15 @@ class IQROutlierDetector:
 
 #Example usage
 def example():
-    
+    data_path = Path("data")
+
+
+    events_raw = pd.read_parquet(data_path / "pwr_events.parquet")
+    park_info = pd.read_parquet(data_path / "parkings.parquet")
+    park_availability_raw = pd.read_parquet(data_path / "parking_availabilities.parquet")
+    sks_raw = pd.read_parquet(data_path / "sks_users.parquet")
+
+
     sks_df, park_df = prepare_dataframes(events_raw, park_availability_raw,sks_raw, park_info)
     detector = IQROutlierDetector(
         value_column="spaces_occupied",
@@ -263,7 +284,6 @@ def example():
     )
 
     train_df = detector.fit(park_df).transform(park_df)
-    test_df=detector.transform(test_df)
 
 
 
