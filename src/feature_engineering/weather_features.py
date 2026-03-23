@@ -139,13 +139,21 @@ def fetch_weather_for_range(
     Returns:
     - Combined DataFrame with weather data
     """
-    today = pd.Timestamp(datetime.now().date())
-    min_date = dates.min()
-    max_date = dates.max()
+    min_date = pd.Timestamp(dates.min())
+    max_date = pd.Timestamp(dates.max())
+
+    tz = min_date.tz
+    if tz is not None:
+        if max_date.tz is None:
+            max_date = max_date.tz_localize(tz)
+        today = pd.Timestamp.now(tz=tz).normalize()
+    else:
+        if max_date.tz is not None:
+            max_date = max_date.tz_localize(None)
+        today = pd.Timestamp.now().normalize()
     
     weather_dfs = []
     
-    # Fetch historical data if needed (dates before today)
     if min_date.date() < today.date():
         hist_end = min(max_date, today - pd.Timedelta(days=1))
         hist_df = fetch_historical_weather(
@@ -156,16 +164,12 @@ def fetch_weather_for_range(
         )
         weather_dfs.append(hist_df)
     
-    # Fetch forecast data if needed (dates from today onwards)
     if max_date.date() >= today.date():
-        # Calculate required forecast days (from today to max_date, inclusive)
         forecast_days = (max_date.date() - today.date()).days + 1
-        # Clamp to API limits (1-16 days)
         forecast_days = max(1, min(forecast_days, 16))
         forecast_df = fetch_weather_forecast(location, features, forecast_days)
         weather_dfs.append(forecast_df)
     
-    # Combine and deduplicate
     if len(weather_dfs) == 1:
         return weather_dfs[0]
     
@@ -204,38 +208,40 @@ def add_weather_features(
     if copy:
         df = df.copy()
     
-    # Convert date column to datetime if not already in this format
     if not pd.api.types.is_datetime64_any_dtype(df[date_col]):
         try:
             df[date_col] = pd.to_datetime(df[date_col])
         except Exception as e:
             raise ValueError(f"Failed to convert '{date_col}' to datetime: {str(e)}")
     
-    # Fetch weather data if not provided
     if weather_df is None:
         weather_df = fetch_weather_for_range(df[date_col], location, features)
     elif copy:
         weather_df = weather_df.copy()
     
-    # Ensure weather_df has datetime column
     if 'time' not in weather_df.columns:
         raise ValueError("weather_df must have a 'time' column")
     
     if not pd.api.types.is_datetime64_any_dtype(weather_df['time']):
         weather_df['time'] = pd.to_datetime(weather_df['time'])
     
-    # Round datetime to nearest hour for merging (weather data is hourly)
-    df['_merge_time'] = df[date_col].dt.floor('h')
-    weather_df['_merge_time'] = weather_df['time'].dt.floor('h')
-    
-    # Remove 'time' column from weather_df to avoid conflicts
-    weather_cols = [col for col in weather_df.columns if col not in ['time', '_merge_time']]
-    merge_df = weather_df[['_merge_time'] + weather_cols].drop_duplicates(subset=['_merge_time'])
-    
-    # Merge weather data
-    df = df.merge(merge_df, on='_merge_time', how='left')
-    
-    # Clean up merge column
+    merge_time_df = pd.to_datetime(df[date_col], utc=True).dt.floor('h').dt.tz_localize(None)
+    merge_time_weather = pd.to_datetime(weather_df['time'], utc=True).dt.floor('h').dt.tz_localize(None)
+
+    left_df = df.assign(_merge_time=merge_time_df)
+    right_df = weather_df.assign(_merge_time=merge_time_weather)
+
+
+    weather_cols = [col for col in right_df.columns if col not in ['time', '_merge_time']]
+    merge_df = right_df[['_merge_time'] + weather_cols].drop_duplicates(subset=['_merge_time'])
+
+    df = left_df.merge(merge_df, on='_merge_time', how='left')
+
     df = df.drop(columns=['_merge_time'])
     
     return df
+
+df = pd.read_parquet("data/Data/parking_availabilities.parquet")
+print(df.head())
+df_with_weather = add_weather_features(df, date_col='measured_at', location=DEFAULT_LOCATION, features=DEFAULT_FEATURES)
+df_with_weather.to_csv("data/parkings_with_weather.csv", index=False)
