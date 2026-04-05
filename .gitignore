@@ -206,3 +206,7 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+data/parkings.parquet
+data/parking_availabilities.parquet
+data/pwr_events.parquet
+data/sks_users.parquet
