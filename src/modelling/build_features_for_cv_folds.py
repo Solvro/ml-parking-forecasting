@@ -72,8 +72,9 @@ def build_features_for_cv_folds(
             roll_windows=roll_windows,
             freq=freq,
             copy=copy,
-            return_pipeline=True,  # Request pipeline back
-            fitted_pipeline=None   # Force fit_transform
+            return_pipeline=True,
+            fitted_pipeline=None,
+            apply_lookback=True,
         )
 
         # 2. Process Validation Data (Apply learned statistics, NO fitting)
@@ -89,8 +90,9 @@ def build_features_for_cv_folds(
             roll_windows=roll_windows,
             freq=freq,
             copy=copy,
-            return_pipeline=False,       # Only need the DataFrame
-            fitted_pipeline=fitted_pipe  # Pass the pipeline trained on train_df
+            return_pipeline=False,
+            fitted_pipeline=fitted_pipe,
+            apply_lookback=True,
         )
 
         results.append(
