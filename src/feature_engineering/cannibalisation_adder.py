@@ -3,7 +3,6 @@ import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 
 # Order in which neighbor types map to ranks (0 = closest).
-# If you need more neighbors, just add them here and ensure parkings_df has the corresponding *_id columns (or geo data to derive them).
 _NEIGHBOR_RANK = {
     "closest": 0,
     "second_closest": 1,
