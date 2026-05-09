@@ -4,15 +4,7 @@ import datetime as dt
 from sklearn.base import BaseEstimator, TransformerMixin
 class ParkingSpacesCorrector(BaseEstimator, TransformerMixin):
     """Corrects parking space counts based on expansion status and calculates additional features related to capacity and utilization.
-    First grouping columns should be parking_id as it is used for the mapping of expansion dates and previous capacities.
-     Parameters:
-     - parkings_df: A DataFrame containing parking information with 'id', 'name', and 'max_spaces_left' columns.
-     - expansion_date_map: A dictionary mapping parking names to their expansion dates (e.g., {"Parking Wrońskiego": '2025-05-21'}).
-     - previous_size_map: A dictionary mapping parking names to their capacities before expansion (e.g., {"Parking Wrońskiego": 192}).
-     - convert_to_32: A boolean indicating whether to convert certain columns to 32-bit types to save memory (default is False).
-     - copy: A boolean indicating whether to create a copy of the input DataFrame before transformation (default is True).
-     - group_cols: A list of column names to group by before applying the corrections (default is ['parking_id']).
-    """
+    First grouping columns should be parking_id as it is used for the mapping of expansion dates and previous capacities."""
 
     def __init__(self, parkings_df, expansion_date_map, previous_size_map, convert_to_32=False, copy = True, group_cols=['parking_id']):
         self.parkings_df = parkings_df

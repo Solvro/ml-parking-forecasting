@@ -1,11 +1,7 @@
 import pandas as pd
 import numpy as np 
 from sklearn.base import BaseEstimator, TransformerMixin
-"""Adds day-related features and parking open status based on parking hours.
-Parameters:
-- df_parkings: A DataFrame containing parking information with 'id', 'open_hour', and 'close_hour' columns.
-- convert_to_32: A boolean indicating whether to convert the 'is_open' column to 32-bit integer type to save memory (default is False).    
-"""
+"""Adds day-related features such as day of the week, weekend indicator, and parking open status based on parking hours."""
 class DayFeaturesCreator(BaseEstimator, TransformerMixin):
     def __init__(self, df_parkings, convert_to_32=False, copy=True):
         self.df_parkings = df_parkings.copy()

@@ -1,8 +1,0 @@
-services:
-  parkings-ml-app:
-    build: .
-    ports:
-      - "8888:8888"
-    volumes:
-      - .:/app 
-    

@@ -3,14 +3,7 @@ import numpy as np
 import datetime as dt
 from sklearn.base import BaseEstimator, TransformerMixin
 class LagFeaturesCreator(BaseEstimator, TransformerMixin):
-    """Creates lag features for specified columns based on parking_id groups
-     Parameters:
-     - lag_features: A dictionary specifying the lag features to create, where each key is an identifier and the value is a tuple containing (suffix, window_size, columns).
-     - convert_to_32: A boolean indicating whether to convert the new feature columns to 32-bit types to save memory (default is False).
-     - copy: A boolean indicating whether to create a copy of the input DataFrame before transformation (default is True). 
-     - group_cols: A list of column names to group by before calculating lag features (default is ['parking_id']).
-     - fill_nan_with_zero: A boolean indicating whether to fill NaN values in the new feature columns with zero (default is False).
-    """
+    """Creates lag features for specified columns based on parking_id groups"""
     def __init__(self, lag_features, convert_to_32=False, copy=True, group_cols=['parking_id'], fill_nan_with_zero=False):
         self.lag_features = lag_features
         self.group_cols = group_cols
@@ -38,8 +31,6 @@ class LagFeaturesCreator(BaseEstimator, TransformerMixin):
             if self.fill_nan_with_zero:
                 X[new_col_names] = X[new_col_names].fillna(0)
 
-        if "utilization_rate" in X.columns:
-            X = X.drop(["utilization_rate"], axis=1)  # Drop original utilization_rate to prevent data leakage, as we have its lagged versions as features
         if self.convert_to_32:
             try:
                 new_cols = [f"{col}_{suffix}" for _, (suffix, _, columns) in self.lag_features.items() for col in columns]

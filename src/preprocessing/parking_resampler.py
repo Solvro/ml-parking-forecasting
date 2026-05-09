@@ -3,17 +3,6 @@ import numpy as np
 import datetime as dt
 from sklearn.base import BaseEstimator, TransformerMixin
 class ParkingResampler(BaseEstimator, TransformerMixin):
-    """Custom transformer for resampling parking availability data.
-    It takes a Dataframe and returns a resampled version of it based on the specified aggregation rules and frequency.
-        Parameters:
-        - agg_rules: A dictionary specifying the aggregation rules for each column (e.g., {'spaces
-        _left': 'mean'}).
-        - rule: A string representing the resampling frequency (default is '5min').
-        - convert_to_32: A boolean indicating whether to convert integer and float columns to 32
-        bit types to save memory (default is False).
-        - copy: A boolean indicating whether to create a copy of the input DataFrame before transformation (default is True).
-        - group_cols: A list of column names to group by before resampling (default is ['parking_id']).
-    """
     def __init__(self, agg_rules, rule='5min', convert_to_32=False, copy = True, group_cols =['parking_id']):
         self.rule = rule
         self.convert_to_32 = convert_to_32
