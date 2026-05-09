@@ -3,7 +3,7 @@ from typing import Optional, Tuple, Union
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
-from src.feature_engineering.feature_pipline import build_feature_pipeline
+from src.feature_engineering.feature_pipeline import build_feature_pipeline, FeaturePipelineConfig
 from src.modelling.lookback_days import required_lookback_periods
 
 
@@ -92,9 +92,11 @@ def build_features_for_range(
     df = df.sort_values("measured_at").reset_index(drop=True)
 
     # 4. Run the shared feature pipeline (ML safe)
+    config = FeaturePipelineConfig().from_json("../config/default.json")
     if fitted_pipeline is None:
         # Training phase: Instantiate and fit the pipeline
         pipeline = build_feature_pipeline(
+            config=config,
             df_sks_users=df_sks_users,
             df_parkings=df_parkings,
             df_calendar=df_calendar,

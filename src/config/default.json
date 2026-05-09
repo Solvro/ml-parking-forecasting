@@ -1,0 +1,169 @@
+{
+  "agg_rules": {
+    "spaces_left": "mean"
+  },
+  "expansions": {
+    "Parking Wrońskiego": "2025-05-21"
+  },
+  "size_before_expansion": {
+    "Parking Wrońskiego": 192
+  },
+  "rolling_features": {
+    "1": [
+      "delta_1h",
+      "delta",
+      12,
+      [
+        "spaces_left"
+      ]
+    ],
+    "2": [
+      "Rolling_mean_1d",
+      "mean",
+      288,
+      [
+        "spaces_left"
+      ]
+    ],
+    "3": [
+      "Rolling_mean_7d",
+      "mean",
+      2016,
+      [
+        "spaces_left"
+      ]
+    ],
+    "4": [
+      "Rolling_std_1d",
+      "std",
+      288,
+      [
+        "spaces_left"
+      ]
+    ],
+    "5": [
+      "Rolling_std_7d",
+      "std",
+      2016,
+      [
+        "spaces_left"
+      ]
+    ],
+    "6": [
+      "Rolling_max_7d",
+      "max",
+      2016,
+      [
+        "spaces_left"
+      ]
+    ],
+    "7": [
+      "Rolling_min_7d",
+      "min",
+      2016,
+      [
+        "spaces_left"
+      ]
+    ]
+  },
+  "expanding_features": {
+    "1": [
+      "cumulative_mean",
+      "mean",
+      [
+        "spaces_left"
+      ]
+    ],
+    "2": [
+      "cumulative_max",
+      "max",
+      [
+        "spaces_left"
+      ]
+    ],
+    "3": [
+      "cumulative_min",
+      "min",
+      [
+        "spaces_left"
+      ]
+    ],
+    "4": [
+      "cumulative_trend",
+      "std",
+      [
+        "spaces_left"
+      ]
+    ]
+  },
+  "lag_features": {
+    "1": [
+      "lag_1h",
+      12,
+      [
+        "spaces_left",
+        "utilization_rate"
+      ]
+    ],
+    "2": [
+      "lag_7d",
+      2016,
+      [
+        "spaces_left",
+        "utilization_rate",
+        "spaces_left_Rolling_mean_7d",
+        "spaces_left_Rolling_std_7d",
+        "spaces_left_Rolling_max_7d",
+        "spaces_left_Rolling_min_7d"
+      ]
+    ]
+  },
+  "cannibalisation_features": {
+    "1": [
+      "cann_closest_parking",
+      "closest",
+      [
+        "spaces_left",
+        "spaces_left_lag_7d",
+        "utilization_rate_lag_1h",
+        "utilization_rate_lag_7d",
+        "spaces_left_delta_1h"
+      ]
+    ],
+    "2": [
+      "cann_second_closest_parking",
+      "second_closest",
+      [
+        "spaces_left",
+        "utilization_rate_lag_1h"
+      ]
+    ],
+    "3": [
+      "cann_third_closest_parking",
+      "third_closest",
+      [
+        "spaces_left",
+        "utilization_rate_lag_1h"
+      ]
+    ],
+    "4": [
+      "cann_fourth_closest_parking",
+      "fourth_closest",
+      [
+        "spaces_left",
+        "utilization_rate_lag_1h"
+      ]
+    ]
+  },
+  "frequency_minutes": 5,
+  "convert_to_32_bit": true,
+  "shift_guard_periods": 15,
+  "cannibalisation_guard_periods": 15,
+  "copy": false,
+  "ffill_limit": 60,
+  "cols_to_impute": [
+    "spaces_left",
+    "active_users",
+    "sks_dist_to_users_ratio"
+  ]
+}

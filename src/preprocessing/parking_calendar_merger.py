@@ -3,7 +3,13 @@ import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 
 class ParkingCalendarMerger(BaseEstimator, TransformerMixin):
-    """Merges parking data with calendar data based on nearest dates and adds a day type feature."""
+    """Merges parking data with calendar data based on nearest dates and adds a day type feature.
+        Parameters:
+        - calendar_df: A DataFrame containing calendar data with 'date' and 'day_type_id' columns.
+        - freq_minutes: The frequency in minutes for merging calendar data (default is 5 minutes
+        - convert_to_32: A boolean indicating whether to convert the 'day_type_id' column to 32-bit integer type to save memory (default is False).
+        - copy: A boolean indicating whether to create a copy of the input DataFrame before transformation (default is True).
+    """
 
     def __init__(self, calendar_df, freq_minutes=5, convert_to_32=False, copy = True):
         self.calendar_df = calendar_df[['date', 'day_type_id']].copy()

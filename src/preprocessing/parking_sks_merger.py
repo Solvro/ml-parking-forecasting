@@ -4,7 +4,17 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 class ParkingSKSMerger(BaseEstimator, TransformerMixin):
     """Merges parking data with SKS user data based on nearest timestamps and calculates a ratio feature. Data from SKS 
-    is shifted by a specified lag to account for data propagation delays and to prevent data leakage."""
+    is shifted by a specified lag to account for data propagation delays and to prevent data leakage.
+     Parameters:
+     - sks_df: A DataFrame containing SKS user data with 'external_timestamp'
+     - parkings_df: A DataFrame containing parking data with 'id' and 'distance_to_sks' columns.
+     - freq_minutes: The frequency in minutes for merging SKS data (default is 5 minutes).
+     - tolerance: The maximum allowed time difference in minutes for merging SKS data (default is 10 minutes).
+     - convert_to_32: A boolean indicating whether to convert certain columns to 32-bit types to save memory (default is False).
+     - users_lag: The number of periods to shift the SKS user data to account for lag (default is 12, which corresponds to 1 hour if the frequency is 5 minutes).
+     - copy: A boolean indicating whether to create a copy of the input DataFrame before transformation (default is True).
+    """
+
 
     def __init__(self, sks_df, parkings_df, freq_minutes=5, tolerance=10, convert_to_32=False, users_lag=12, copy = True):
         self.sks_df = sks_df[['external_timestamp', 'active_users']].sort_values('external_timestamp')

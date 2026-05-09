@@ -3,7 +3,16 @@ import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 
 class CannibalisationFeaturesCreator(BaseEstimator, TransformerMixin):
-    """Adds cannibalisation features based on the nearest neighboring parkings' data, with a guard period to prevent data leakage."""
+    """Adds cannibalisation features based on the nearest neighboring parkings' data, with a guard period to prevent data leakage.
+     Parameters:
+     - parkings_df: A DataFrame containing parking information with 'id' and neighbor parking columns (e.g., 'closest_id', 'second_closest_id', etc.).
+     - cannibalisation_features: A dictionary specifying the cannibalisation features to create, where each key is an identifier and the value is a tuple containing (suffix, neighbor_type, columns).
+     - cannibalisation_guard: The number of periods to shift the neighbor data to prevent data leakage (default is 12 periods, which corresponds to 1 hour if the frequency is 5 minutes).
+     - convert_to_32: A boolean indicating whether to convert the new feature columns to 32-bit types to save memory (default is False).
+     - copy: A boolean indicating whether to create a copy of the input DataFrame before transformation (default is True). 
+     - group_cols: A list of column names to group by before applying the cannibalisation features (default is ['parking_id']).
+     - fill_nan_with_zero: A boolean indicating whether to fill NaN values in the new feature columns with zero (default is False).
+    """
     def __init__(self, parkings_df, cannibalisation_features, cannibalisation_guard=12, convert_to_32=False, copy=True, group_cols=['parking_id'], fill_nan_with_zero=False):
         self.parkings_df = parkings_df.copy()
         self.cannibalisation_features = cannibalisation_features

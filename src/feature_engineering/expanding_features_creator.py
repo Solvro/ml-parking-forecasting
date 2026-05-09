@@ -3,7 +3,15 @@ import numpy as np
 import datetime as dt
 from sklearn.base import BaseEstimator, TransformerMixin
 class ExpandingFeaturesCreator(BaseEstimator, TransformerMixin):
-    """Creates expanding features such as cumulative mean, max, min, and trend for specified columns based on parking_id groups."""
+    """Creates expanding features such as cumulative mean, max, min, and trend for specified columns based on parking_id groups.
+     Parameters:
+     - expanding_features: A dictionary specifying the expanding features to create, where each key is an identifier and the value is a tuple containing (suffix, feature_type, columns).
+     - convert_to_32: A boolean indicating whether to convert the new feature columns to 32-bit types to save memory (default is False).
+     - shift_guard_periods: The number of periods to shift the data before calculating expanding features to prevent data leakage (default is 1 period, which corresponds to 5 minutes if the frequency is 5 minutes).
+     - copy: A boolean indicating whether to create a copy of the input DataFrame before transformation (default is True). 
+     - group_cols: A list of column names to group by before calculating expanding features (default is ['parking_id']).
+     - fill_nan_with_zero: A boolean indicating whether to fill NaN values in the new feature columns with zero (default is False).
+    """
     def __init__(self, expanding_features, convert_to_32=False, shift_guard_periods=1, copy=True, group_cols=['parking_id'], fill_nan_with_zero=False):
         self.expanding_features = expanding_features
         self.group_cols = group_cols
