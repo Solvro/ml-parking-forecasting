@@ -23,7 +23,22 @@ class ParkingSpacesCorrector(BaseEstimator, TransformerMixin):
                 self.feature_names_in_ = X.columns
 
         # Pre-calculate mapping data once during fit
-        meta = self.parkings_df[['id', 'name', 'max_spaces_left']].copy()
+        # If parkings_df doesn't ship `max_spaces_left`, derive it from training data.
+        # Doing it here (in fit) — not in __init__ — keeps the value learned only on X
+        # (the train fold), which is the only leakage-safe place to compute it.
+        parkings = self.parkings_df
+        if 'max_spaces_left' not in parkings.columns:
+            missing = {'id'}.difference(parkings.columns)
+            if missing:
+                raise KeyError(
+                    f"parkings_df must contain 'id' to derive 'max_spaces_left' from X. Missing: {sorted(missing)}."
+                )
+            observed_max = X.groupby('parking_id')['spaces_left'].max()
+            parkings = parkings.merge(
+                observed_max.rename('max_spaces_left'),
+                left_on='id', right_index=True, how='left',
+            )
+        meta = parkings[['id', 'name', 'max_spaces_left']].copy()
 
         # Map expansion dates and previous capacities
         meta['exp_date'] = meta['name'].map(self.expansion_date_map).fillna("2200-01-01")

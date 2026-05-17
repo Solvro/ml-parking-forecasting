@@ -21,6 +21,7 @@ def build_features_for_range(
     copy: bool = False,
     fitted_pipeline: Optional[Pipeline] = None,
     return_pipeline: bool = False,
+    apply_lookback: bool = True,
 ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, Pipeline]]:
     """Build features for a single date range using the shared pipeline.
 
@@ -46,9 +47,13 @@ def build_features_for_range(
             is called. Defaults to None.
         return_pipeline (bool): If True, returns a tuple of (DataFrame, Pipeline).
             Defaults to False.
+        apply_lookback (bool): If True, automatically extends start_date backward
+            by the required lookback periods to load historical data for feature
+            computation. Set to True when using with generate_ts_folds() to ensure
+            lag/rolling features are valid from the first row. Defaults to True.
 
     Returns:
-        pd.DataFrame or Tuple[pd.DataFrame, Pipeline]: The enriched DataFrame 
+        pd.DataFrame or Tuple[pd.DataFrame, Pipeline]: The enriched DataFrame
         limited to [start_date, end_date], and optionally the fitted pipeline.
 
     Raises:
@@ -78,20 +83,26 @@ def build_features_for_range(
         start = start.tz_convert(None) if start.tzinfo is not None else start
         end = end.tz_convert(None) if end.tzinfo is not None else end
 
-    # 3. Compute lookback and slice efficiently
-    lookback_periods = required_lookback_periods(lags, roll_lags, roll_windows)
-    lookback_start = start - (lookback_periods * pd.Timedelta(1, unit=freq))
+    # 3. Compute lookback
+    if apply_lookback:
+        lookback_periods = required_lookback_periods(lags, roll_lags, roll_windows)
+        lookback_start = start - (lookback_periods * pd.Timedelta(1, unit=freq))
+    else:
+        lookback_start = start
 
-    # Optimization: Create mask on datetime series before sorting the whole dataframe
-    temp_dates = pd.to_datetime(base_df["measured_at"])
-    mask = (temp_dates >= lookback_start) & (temp_dates <= end)
-    
+    # Optimization - create mask on datetime series before sorting the whole dataframe
+    mask = (base_df["measured_at"] >= lookback_start) & (base_df["measured_at"] <= end)
+
     # Safely slice and copy
     df = base_df.loc[mask].copy() if copy else base_df.loc[mask]
-    df["measured_at"] = pd.to_datetime(df["measured_at"])
+
+    # Check for empty result
+    if df.empty:
+        raise ValueError(f"No data found in range [{lookback_start}, {end}].")
+
     df = df.sort_values("measured_at").reset_index(drop=True)
 
-    # 4. Run the shared feature pipeline (ML safe)
+    # 4. Run the shared feature pipeline (preventing data leakage)
     if fitted_pipeline is None:
         # Training phase: Instantiate and fit the pipeline
         pipeline = build_feature_pipeline(
@@ -106,7 +117,6 @@ def build_features_for_range(
         df = pipeline.transform(df)
 
     # 5. Trim back to the requested output interval (remove lookback buffer)
-    df["measured_at"] = pd.to_datetime(df["measured_at"])
     df = df.loc[(df["measured_at"] >= start) & (df["measured_at"] <= end)]
     df = df.reset_index(drop=True)
 
