@@ -3,16 +3,7 @@ import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 
 class ParkingImputer(BaseEstimator, TransformerMixin):
-    """Imputes missing values in parking data using a combination of forward-fill, seasonality-based filling, and median imputation.
-    It also creates binary flag columns to indicate which values were imputed.
-        Parameters:
-        - cols_to_impute: A list of column names to impute (default is ['spaces_left']).
-        - freq_minutes: The frequency in minutes for determining the forward-fill limit (default is 5 minutes).
-        - ffill_limit: The maximum time in minutes to forward-fill missing values (default is 60 minutes).
-        - convert_to_32: A boolean indicating whether to convert certain columns to 32-bit types to save memory (default is False).
-        - copy: A boolean indicating whether to create a copy of the input DataFrame before transformation (default is True).
-        - group_cols: A list of column names to group by before imputation (default is ['parking_id']).
-    """
+    """Imputes missing values in parking data using a combination of forward-fill, seasonality-based filling, and median imputation."""
     def __init__(self, cols_to_impute=['spaces_left'], freq_minutes=5, ffill_limit=60, convert_to_32=False, copy=True, group_cols=['parking_id']):
         self.cols_to_impute = cols_to_impute
         self.freq_minutes = freq_minutes
